@@ -46,6 +46,26 @@ class SearchEngineV2:
             for src, hits in found.items()
         }
 
+    def search_bm25_ingredient_priority(self, ingredient_terms: list[str], k: int = 8):
+        """성분명이 매칭됐을 때 커머스에 밀리지 않도록 소스 우선순위를 준다.
+
+        실측 근거: '에칠헥실트리아존 쓰는 선크림'을 전역 검색하면 상위가
+        commerce_review 로 채워지고 formula_full(실제 전성분 데이터)은 밀린다.
+        검색어도 원문 문장 대신 매칭된 성분명만 써야 한다 - '쓰는'·'선크림' 같은
+        서술어가 섞이면 순위가 흔들린다(직접 확인함).
+        """
+        query = " ".join(ingredient_terms)  # 성분명만 - 서술어 제거
+        found = self.search_bm25_per_source(query, k=k)
+
+        # 처방·성분 데이터 우선, 리뷰는 자리가 남으면 채움
+        priority = ["formula_full", "formula_summary", "ingredient", "mfds",
+                   "commerce_review"]
+        merged = []
+        for src in priority:
+            for h in found.get(src, []):
+                merged.append({**h, "source": src})
+        return merged[:k]
+
     def search_vector(self, query: str, k: int = 10):
         ok, why = df_gate(query, self.index)
         if not ok:

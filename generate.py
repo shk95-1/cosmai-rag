@@ -143,7 +143,17 @@ class AnswerGenerator:
             if route == "temporal_filter":
                 payload = self._search_temporal(decision, k)
             elif route == "bm25":
-                payload = self.engine.search_bm25(question, k)
+                from router import DOMAIN_TOPIC_TERMS
+                real_ingredients = [i for i in decision.matched_ingredients
+                                    if i not in DOMAIN_TOPIC_TERMS]
+                if real_ingredients:
+                    # 진짜 화학성분명이 있으면 formula 소스 우선 + 성분명만으로 검색
+                    payload = self.engine.search_bm25_ingredient_priority(
+                        real_ingredients, k)
+                else:
+                    # '백탁'처럼 도메인/주제어만 매칭됐으면 기존 전역 검색 그대로
+                    # (커머스 리뷰가 오히려 정답인 경우라 우선순위를 걸면 안 됨)
+                    payload = self.engine.search_bm25(question, k)
             else:  # vector
                 payload = self.engine.search_vector(question, k)
 
